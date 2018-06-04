@@ -1,17 +1,31 @@
+// Universidade de Brasília
+// Instituto de Ciências Exatas
+// Departamento: CIC/EST
+// Ciência da Computação
+// Disciplina: Teoria e Aplicação de Grafos
+// Professor: Dibio Leandro Borges
+// Período: 2018/1
+// Projeto 3
+// Alunos:
+// 	Gabriel dos Santos Martins - 15/0126298
+// 	Fillype Alves do Nascimento - 16/0070431
+
 #include <iostream>
 #include <string>
 #include <list>
-#include <stack>
 #include <fstream>
-#include <queue>
 #include <map>
 
 using namespace std;
 class Graph{
     map<list<int>, list<string>> professores;
     map<string, list<int>> escolas_contratantes;
+    map<list<int>, string> assignments_professores;
+    map<string, list<list<int>>> assignments_escolas;
+    int total_vagas = 0 , total_professores = 0;
 
     public:
+    //funcao que le do arquivo e faz o parse
     void inicializaMaps(){
         string line, number, escola;
         list<int> professor, info_escola;
@@ -32,12 +46,15 @@ class Graph{
                 }
                 prof_number = stoi(number);
                 professor.push_back(prof_number);
+                total_professores+=1;
                 i+=2;
                 number = line[i];
                 habilitacao = stoi(number);
+                // cout << habilitacao << "\n";
                 professor.push_back(habilitacao);
+                assignments_professores[professor] = "";
 
-                cout << prof_number << " " << habilitacao << "\n";
+                // cout << prof_number << " " << habilitacao << "\n";
 
                 i+=5;
                 j=0;
@@ -66,13 +83,13 @@ class Graph{
                     }
                 }while(line[i] != '\n');
 
-                for (auto v : escolas){
-                    cout << v << " ";
-                }
+                // for (auto v : escolas){
+                //     cout << v << " ";
+                // }
 
                 professores[professor] = escolas;
 
-                cout << "\n";
+                // cout << "\n";
                 professor.clear();
                 escolas.clear();
             }
@@ -86,6 +103,7 @@ class Graph{
                     }
                     else{
                         escola = line.substr(1, j);
+                        assignments_escolas[escola] = {};
                         // cout << escola << "\n";
                         i+=3;
                         number = line.substr(i, 1);
@@ -96,10 +114,12 @@ class Graph{
                         i+=4;
                         number = line.substr(i, 1);
                         vagas = stoi(number);
+                        total_vagas+=vagas;
                         // cout << vagas << "\n";
                         info_escola.push_back(vagas);
 
                         escolas_contratantes[escola] = info_escola;
+                        info_escola.clear();
                         i++;
                     }
                     i++;
@@ -107,12 +127,82 @@ class Graph{
             }
         }
 
-        cout << professores.size() << "\n";
-        cout << escolas_contratantes.size() << "\n";
+        // cout << professores.size() << "\n";
+        // cout << escolas_contratantes.size() << "\n";
+        // cout << total_professores << "\n";
+        // cout << total_vagas << "\n";
+        // cout << assignments_professores.size() << "\n";
+        // cout << assignments_escolas.size() << "\n";
+    }
+
+    void assignmentsArrangement(){
+        map<string, list<int>>::iterator imprime_emparelhamento;
+        map<list<int>, list<string>>::iterator it;
+        map<list<int>, string>::iterator print_assignment_prof;
+        map<string, list<list<int>>>::iterator print_assignment_escolas;
+        list<list<int>>::iterator iter, get_professores;
+        list<int> professor_avaliado;
+        string escola_escolhida;
+        bool trocar = true;
+        int i=0;    
+
+        //o método de emparelhamento aplicado leva em consideração que caso não seja possível preencher a vaga da escola com um professor com a quantidade de habilitações solicitadas
+        //haverá preenchimento de vaga com outro professor; válido lembrar que o algorítmo favorece os professores e suas escolhas;
+
+        //loop para iterar entre todas as opções de escolas dos professores
+        while(!professores.begin()->second.empty() && total_professores > 0){
+            for (it = professores.begin(); (it != professores.end()) && (!it->second.empty()); it++){
+                professor_avaliado = it->first;
+                escola_escolhida = it->second.front();
+                it->second.pop_front();
+
+                //verifica se o professor está livre e se existe vaga na escola avaliada 
+                if(assignments_professores[professor_avaliado] == "" && assignments_escolas[escola_escolhida].size() < escolas_contratantes[escola_escolhida].back()){
+                    assignments_professores[professor_avaliado] = escola_escolhida;
+                    assignments_escolas[escola_escolhida].push_front(professor_avaliado);
+                    total_vagas--;
+                    total_professores--;
+                }
+                //se não houver vaga na escola avaliada, verifica se todos os que estão associados à escola possuem a habilitaçao requisitada pela mesma
+                else if(assignments_professores[professor_avaliado] == "" && assignments_escolas[escola_escolhida].size() >= escolas_contratantes[escola_escolhida].back()){
+                    trocar = true;
+                    for(iter = assignments_escolas[escola_escolhida].begin(); iter != assignments_escolas[escola_escolhida].end() && assignments_escolas[escola_escolhida].size() > escolas_contratantes[escola_escolhida].back(); iter++){
+                        //caso haja algum que não tenha a habilitação solicitada pela escola, o mesmo é retirado e o novo professor é colocado
+                        if((*iter).back() != escolas_contratantes[escola_escolhida].front() && it->first.back() == escolas_contratantes[escola_escolhida].front() && trocar){
+                            assignments_professores[*iter] = "";
+                            assignments_escolas[escola_escolhida].erase(iter);
+                            assignments_professores[professor_avaliado] = escola_escolhida;
+                            assignments_escolas[escola_escolhida].push_front(professor_avaliado);
+                            trocar = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        cout << "Emparelhamento por professores: \n";
+        for(print_assignment_prof = assignments_professores.begin(); print_assignment_prof != assignments_professores.end(); print_assignment_prof++){
+            cout << "P" << print_assignment_prof->first.front() << ": ";
+            cout << print_assignment_prof->second << endl;
+        }
+
+        cout << "\n\nEmparelhamento por escolas e suas respectivas vagas:\n";
+
+        for(imprime_emparelhamento = escolas_contratantes.begin(); imprime_emparelhamento != escolas_contratantes.end(); imprime_emparelhamento++){
+            cout << imprime_emparelhamento->first << ": ";
+
+            for(get_professores = assignments_escolas[imprime_emparelhamento->first].begin(); get_professores != assignments_escolas[imprime_emparelhamento->first].end(); get_professores++){
+                cout << "P" << (*get_professores).front() << "  ";
+            }
+            cout << "\n";
+            
+        }
+
     }
 };
 
 int main(){
     Graph gbipart;
     gbipart.inicializaMaps();
+    gbipart.assignmentsArrangement();
 }
